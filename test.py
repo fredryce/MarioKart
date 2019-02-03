@@ -5,13 +5,16 @@ import multiprocessing
 from goprocam import GoProCamera
 from goprocam import constants
 
+
+#problem the detection frame is still too far behind, and when its taking priority, its offsetting the ponits too much. how to calculate which one is more accurate one
+
 def determine_bound(nose,reye, leye):
-    #print(nose, reye, leye)
-    leftLine = leye[0]
-    rightLine = reye[0]
-    topLine = min(leye[1], reye[1])
-    bottomLine = nose[1]
-    return (int(leftLine), int(rightLine), int(topLine),int(bottomLine))
+    try:
+        rightLine = leftLine = (leye[0] + reye[0]) / 2
+        topLine = bottomLine = (min(leye[1], reye[1]) + nose[1])/2
+        return (int(leftLine), int(rightLine), int(topLine),int(bottomLine))
+    except Exception as e:
+        return None
 
 
 def run_detection(recieve_que, send_que, after_frame_que):
@@ -64,7 +67,7 @@ def checkCommand(bound, nose, reye, leye, frame):
 
 
 def main():
-     
+        
     #cap = cv2.VideoCapture("udp://127.0.0.1:10000")
     cap = cv2.VideoCapture(0)
     # Create old frame
@@ -72,7 +75,7 @@ def main():
     old_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
      
     # Lucas kanade params
-    lk_params = dict(winSize = (20, 20),
+    lk_params = dict(winSize = (25, 25),
                      maxLevel = 4,
                      criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
      
@@ -94,24 +97,24 @@ def main():
         _, frame = cap.read()
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        if point_selected is False and stop_detection is False:
+        if point_selected is False and stop_detection is False: #initial running the detection
             recieve_que.put((frame, frame_num))
             stop_detection = True
             stopped_frame = frame_num + 1
 
-        if stop_detection:
-            if (frame_num - stopped_frame) %2 == 0 and (frame_num - stopped_frame) < 10:
-                after_frame_que.put((gray_frame, frame_num))
+        #if stop_detection:
+        #    if (frame_num - stopped_frame) %2 == 0 and (frame_num - stopped_frame) < 10:
+        #       after_frame_que.put((gray_frame, frame_num))
 
 
 
             
-        if not send_que.empty():
+        if not send_que.empty(): #gettign result back from detection
             center, frame_number = send_que.get()
             point_selected = True
             old_points = center
 
-            #print(frame_number)
+            print(frame_number)
 
             if frame_number <= 500 and frame_number > 1:
                 bound = determine_bound(tuple(center[0]), tuple(center[1]), tuple(center[2]))
@@ -127,14 +130,18 @@ def main():
                         bound = inital_bound
 
         if point_selected:
-            if frame_num % 10 ==0:
+            if frame_num % 5 ==0:
                 point_selected = False
                 stop_detection = False
+            new_points = center
 
+        else:
+            try:
+                new_points, status, error = cv2.calcOpticalFlowPyrLK(old_gray, gray_frame, old_points, None, **lk_params)
+            except Exception as e:
+                pass
 
         try:
-                
-            new_points, status, error = cv2.calcOpticalFlowPyrLK(old_gray, gray_frame, old_points, None, **lk_params)
             old_gray = gray_frame.copy()
             old_points = new_points
             x1, y1,x2,y2,x3,y3 = new_points.ravel()
@@ -144,6 +151,7 @@ def main():
             cv2.circle(frame, (x3, y3), 5, (0, 255, 0), -1)
         except Exception as e:
             pass
+            
         if bound:
             height, width, _ = frame.shape
             cv2.line(frame, (bound[0], 0), (bound[0], height),(0, 255, 0), 1)
