@@ -1,11 +1,12 @@
+import os, glob
 from tf_pose.networks import get_graph_path, model_wh
 from tf_pose.estimator import TfPoseEstimator
 from tf_pose import common
 import cv2
-import os, glob
 import pandas as pd
 from itertools import chain
 import datetime
+import numpy as np
 
 
 def find_iou(boxA, boxB):
@@ -37,34 +38,16 @@ class OpenPose(TfPoseEstimator):
 	    if imgcopy:
 	        npimg = np.copy(npimg)
 	    image_h, image_w = npimg.shape[:2]
-	    centers = {}
-	    timestamp = datetime.datetime.now()
-	    current_row = []
-	    current_row.append(timestamp)
+	    center = None
 	    for human in humans:
-		    for i in range(common.CocoPart.Background.value):
-		        if i not in human.body_parts.keys():
-		            current_row.append(0)
-		       	    current_row.append(0)
-		            continue
-		        body_part = human.body_parts[i]
-		        center = (int(body_part.x * image_w + 0.5), int(body_part.y * image_h + 0.5))
-		        current_row.append(center[0])
-		        current_row.append(center[1])
-
-		        centers[i] = center
-		        cv2.circle(npimg, center, 3, common.CocoColors[i], thickness=3, lineType=8, shift=0)
-
-		    # draw line
-		    for pair_order, pair in enumerate(common.CocoPairsRender):
-		        if pair[0] not in human.body_parts.keys() or pair[1] not in human.body_parts.keys():
-		            continue
-		        cv2.line(npimg, centers[pair[0]], centers[pair[1]], common.CocoColors[pair_order], 3)
-		    current_row.append(0)
-		    if self.convert_csv:
-		    	self.temp_list.append(current_row)
+		    if 0 in human.body_parts.keys() and 14 in human.body_parts.keys() and 15 in human.body_parts.keys():
+		        body_part = human.body_parts[0]
+		        body_part_reye = human.body_parts[14]
+		        body_part_leye = human.body_parts[15]
+		        #center = (int(body_part.x * image_w + 0.5), int(body_part.y * image_h + 0.5))
+		        center = np.array([[int(body_part.x * image_w + 0.5), int(body_part.y * image_h + 0.5)],[int(body_part_reye.x * image_w + 0.5), int(body_part_reye.y * image_h + 0.5)],[int(body_part_leye.x * image_w + 0.5), int(body_part_leye.y * image_h + 0.5)]], dtype=np.float32)
 		    break
-	    return npimg
+	    return center
 
 	def top_bottom_ratio(self, top_distance, bottom_distance ,body, center):
 		if body[1] < center[1]:
