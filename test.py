@@ -69,7 +69,7 @@ def checkCommand(bound, nose, reye, leye, frame):
 def main():
         
     #cap = cv2.VideoCapture("udp://127.0.0.1:10000")
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture('./test.mp4')
     # Create old frame
     _, frame = cap.read()
     old_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
